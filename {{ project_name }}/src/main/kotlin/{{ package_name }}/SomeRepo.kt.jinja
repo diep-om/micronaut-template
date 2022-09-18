@@ -1,0 +1,35 @@
+package {{ package_name }}
+
+import jakarta.inject.Singleton
+import {{ package_name }}.generated.tables.pojos.Office
+import {{ package_name }}.generated.tables.pojos.Order
+import {{ package_name }}.generated.tables.references.CUSTOMER
+import {{ package_name }}.generated.tables.references.OFFICE
+import {{ package_name }}.generated.tables.references.ORDER
+import {{ package_name }}.pojos.CustomerAndOrder
+import org.jooq.DSLContext
+import java.time.LocalDate
+
+@Singleton
+class SomeRepo(private val ctx: DSLContext) {
+    fun findOfficesInTerritory(territory: String): List<Office> {
+        return ctx.selectFrom(OFFICE)
+            .where(OFFICE.TERRITORY.eq(territory))
+            .fetchInto(Office::class.java)
+    }
+
+    fun findOrdersByRequiredDate(startDate: LocalDate, endDate: LocalDate): List<Order> {
+        return ctx.selectFrom(ORDER)
+            .where(ORDER.REQUIRED_DATE.between(startDate, endDate))
+            .fetchInto(Order::class.java)
+    }
+
+    fun findCustomersAndOrders(): MutableList<CustomerAndOrder> {
+        return ctx.select(CUSTOMER.CUSTOMER_NAME, ORDER.ORDER_DATE)
+            .from(ORDER)
+            .innerJoin(CUSTOMER).using(CUSTOMER.CUSTOMER_NUMBER)
+            .orderBy(ORDER.ORDER_DATE.desc())
+//            .fetchInto(CustomerAndOrder::class.java)
+            .fetch { CustomerAndOrder(it[CUSTOMER.CUSTOMER_NAME], it[ORDER.ORDER_DATE]) }
+    }
+}

@@ -1,0 +1,17 @@
+dependencyResolutionManagement {
+    versionCatalogs {
+        create("libs") {
+            version("kotlin", "{{ kotlin_version }}")
+            version("mysql", "{{ mysql_version }}")
+            version("database-rider", "1.34.0")
+            library("kotlin-reflect", "org.jetbrains.kotlin", "kotlin-reflect").versionRef("kotlin")
+            library("kotlin-stdlib", "org.jetbrains.kotlin", "kotlin-stdlib-jdk8").versionRef("kotlin")
+            library("mysql-connector", "mysql", "mysql-connector-java").versionRef("mysql")
+            library("dbRider-core", "com.github.database-rider", "rider-core").versionRef("database-rider")
+            library("dbRider-junit", "com.github.database-rider", "rider-junit5").versionRef("database-rider")
+            bundle("dbRider", listOf("dbRider-core", "dbRider-junit"))
+        }
+    }
+}
+
+rootProject.name = "{{ project_name }}"

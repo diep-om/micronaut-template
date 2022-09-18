@@ -1,0 +1,42 @@
+package {{ package_name }}
+
+import com.github.database.rider.core.api.dataset.DataSet
+import com.github.database.rider.core.api.dataset.ExpectedDataSet
+import com.github.database.rider.junit5.api.DBRider
+import io.kotest.matchers.collections.shouldContainExactly
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import {{ package_name }}.generated.tables.records.CustomerRecord
+import {{ package_name }}.generated.tables.references.CUSTOMER
+import org.jooq.DSLContext
+import org.junit.jupiter.api.Test
+
+@MicronautTest
+@DBRider
+class SomeDbTest(private val ctx: DSLContext) {
+    @Test
+    @DataSet("customer.yml", disableConstraints = true)
+    fun recordMapperFetchTest() {
+        data class Customer(val name: String, val phone: String)
+        val customers = ctx
+            .select(CUSTOMER.CUSTOMER_NAME.`as`("name"), CUSTOMER.PHONE.`as`("phone"))
+            .from(CUSTOMER)
+            .orderBy(CUSTOMER.CUSTOMER_NUMBER)
+            .fetchInto(Customer::class.java)
+
+        customers shouldContainExactly listOf(Customer("Mike", "111111"), Customer("John", "222222"))
+    }
+
+    @Test
+    @DataSet("customer.yml", disableConstraints = true)
+    @ExpectedDataSet("customer_expected.yml")
+    fun updateTest() {
+        ctx.update(CUSTOMER)
+            .set(CUSTOMER.PHONE, "333333")
+            .where(CUSTOMER.CUSTOMER_NUMBER.eq(1))
+            .execute()
+
+        val record = CustomerRecord()
+        record.phone = "444444"
+        ctx.executeUpdate(record, CUSTOMER.CUSTOMER_NUMBER.eq(2))
+    }
+}

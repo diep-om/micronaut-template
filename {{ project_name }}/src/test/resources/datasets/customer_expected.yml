@@ -1,0 +1,7 @@
+customer:
+  - customer_number: 1
+    customer_name: Mike
+    phone: "333333"
+  - customer_number: 2
+    customer_name: John
+    phone: "444444"

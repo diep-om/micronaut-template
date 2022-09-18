@@ -1,0 +1,11 @@
+package {{ package_name }}
+
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+@Controller("/")
+class HelloController {
+    @Get("/hello", produces = [MediaType.TEXT_PLAIN])
+    fun hello() = "Hello"
+}

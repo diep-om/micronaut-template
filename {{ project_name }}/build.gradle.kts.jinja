@@ -1,0 +1,184 @@
+import io.github.cdimascio.dotenv.dotenv
+import org.jooq.meta.jaxb.ForcedType
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("io.github.cdimascio:dotenv-kotlin:6.3.1")
+        classpath("org.flywaydb:flyway-mysql:{{ flyway_version }}")
+    }
+}
+
+plugins {
+    id("org.jetbrains.kotlin.jvm") version "{{ kotlin_version }}"
+    id("org.jetbrains.kotlin.kapt") version "{{ kotlin_version }}"
+    id("org.jetbrains.kotlin.plugin.allopen") version "{{ kotlin_version }}"
+    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("io.micronaut.application") version "3.6.2"
+    id("org.flywaydb.flyway") version "{{ flyway_version }}"
+    id("nu.studer.jooq") version "7.1.1"
+}
+
+version = "0.1"
+group = "{{ package_name }}"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    kapt("io.micronaut:micronaut-http-validation")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("io.micronaut.kotlin:micronaut-kotlin-runtime")
+    implementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    implementation("io.micronaut.sql:micronaut-jooq")
+    implementation("jakarta.annotation:jakarta.annotation-api")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:${libs.versions.kotlin}")
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:${libs.versions.kotlin}")
+//    implementation(libs.kotlin.reflect)
+//    implementation(libs.kotlin.stdlib)
+    implementation("io.micronaut:micronaut-validation")
+
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("com.fasterxml.jackson.module:jackson-module-kotlin")
+    runtimeOnly(libs.mysql.connector)
+
+    implementation("org.jooq:jooq:3.17.4")
+    jooqGenerator(libs.mysql.connector)
+
+    testImplementation("io.kotest:kotest-assertions-core:5.4.2")
+    testImplementation(libs.bundles.dbRider)
+}
+
+val dotenv = dotenv {
+    filename = "${property("dotEnv")}"
+}
+
+flyway {
+    url = dotenv["db.url"]
+    user = dotenv["db.user"]
+    password = dotenv["db.password"]
+    cleanDisabled = false
+    locations = arrayOf("filesystem:src/main/resources/db/migration")
+}
+
+jooq {
+    configurations {
+        create("main") {
+            jooqConfiguration.apply {
+                generateSchemaSourceOnCompilation.set(true)
+                logging = org.jooq.meta.jaxb.Logging.INFO
+                jdbc.apply {
+                    driver = dotenv["db.driver"]
+                    url = dotenv["db.url"]
+                    user = dotenv["db.user"]
+                    password = dotenv["db.password"]
+                }
+                generator.apply {
+                    name = "org.jooq.codegen.KotlinGenerator"
+                    database.apply {
+                        name = "org.jooq.meta.mysql.MySQLDatabase"
+                        forcedTypes = listOf(
+                            ForcedType().apply {
+                                name = "GEOMETRY"
+                                includeTypes = "POINT"
+                            }
+                        )
+                        inputSchema = dotenv["db.name"]
+                        isOutputSchemaToDefault = true
+                        schemaVersionProvider = "SELECT MAX(version) FROM flyway_schema_history"
+                        includes = ".*"
+                        excludes = """
+                            flyway_schema_history | sequences
+                            | customer_pgs | refresh_top3_product
+                            | sale_.* | set_.* | get_.* | .*_master
+                        """.trimIndent()
+                        logSlowQueriesAfterSeconds = 20
+                    }
+                    generate.apply {
+                        isDeprecated = false
+                        isRecords = true
+                        isPojos = true
+                        isDaos = false
+                        isIndexes = false
+                        isKeys = false
+                    }
+                    target.apply {
+                        packageName = "{{ package_name }}.generated"
+                        directory = "build/generated-sources/jooq"
+                    }
+                }
+            }
+        }
+    }
+}
+
+tasks {
+    named<nu.studer.gradle.jooq.JooqGenerate>("generateJooq") {
+        dependsOn("flywayMigrate")
+
+        // Flyway migration scripts as input for JOOQ task
+        inputs.files(fileTree("src/main/resources/db/migration"))
+            .withPropertyName("migrations")
+            .withPathSensitivity(PathSensitivity.RELATIVE)
+
+        // For incremental builds
+        allInputsDeclared.set(true)
+        outputs.cacheIf { true }
+    }
+
+    register<org.flywaydb.gradle.task.FlywayMigrateTask>("flywayUnitMigrate") {
+        url = dotenv["test.db.url"]
+    }
+
+    register<org.flywaydb.gradle.task.FlywayCleanTask>("flywayUnitClean") {
+        url = dotenv["test.db.url"]
+    }
+
+    named<JavaExec>("run") {
+        dotenv.entries()
+            .filter { !it.key.startsWith("test.") }
+            .forEach { environment(it.key, it.value) }
+    }
+
+    named<Test>("test") {
+        dependsOn("flywayUnitMigrate")
+        dotenv.entries()
+            .forEach { environment(it.key, it.value) }
+    }
+}
+
+application {
+    mainClass.set("{{ package_name }}.ApplicationKt")
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("11")
+}
+
+tasks {
+    compileKotlin {
+        kotlinOptions {
+            jvmTarget = "11"
+        }
+    }
+    compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "11"
+        }
+    }
+}
+
+graalvmNative.toolchainDetection.set(false)
+
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("{{ package_name }}.*")
+    }
+}

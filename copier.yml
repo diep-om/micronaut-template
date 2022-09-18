@@ -1,0 +1,33 @@
+project_name:
+  type: str
+package_name:
+  type: str
+  default: "{{ project_name }}"
+db_name:
+  type: str
+db_user:
+  type: str
+db_password:
+  type: str
+  default: ""
+test_db_name:
+  type: str
+  default: "{{ db_name }}_test"
+kotlin_version:
+  type: str
+  default: 1.7.20
+micronaut_version:
+  type: str
+  default: 3.7.1
+mysql_version:
+  type: str
+  default: 8.0.30
+flyway_version:
+  type: str
+  default: 9.4.0
+_exclude:
+  - copier.yml
+  - README.md
+  - .git
+  - .gitignore
+  - .DS_Store

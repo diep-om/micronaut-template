@@ -1,0 +1,18 @@
+micronaut:
+  application:
+    name: '{{ project_name }}'
+datasources:
+  default:
+    url: jdbc:mysql:///{{ db_name }}
+    username: {{ db_user }}
+    password: "{{ db_password }}"
+    driverClassName: com.mysql.cj.jdbc.Driver
+    db-type: mysql
+jooq:
+  datasources:
+    default:
+      sql-dialect: mysql
+netty:
+  default:
+    allocator:
+      max-order: 3
